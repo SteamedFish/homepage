@@ -1,0 +1,56 @@
+---
+title: "Emacs 在 .dir-locals.el 中执行 elisp 语句"
+date: 2019-05-03T22:53:09+08:00
+categories:
+  - Emacs
+tags:
+  - Emacs
+---
+
+#+TITLE:     Emacs 在 .dir-locals.el 中执行 elisp 语句
+#+AUTHOR:    SteamedFish
+#+DATE:      2019-05-03
+
+
+在 =.dir-locals.el= 中可以控制目录级别的变量。这个文件不是一个 elisp 代码文件，
+而是只能存放一个 Association List （联合列表，alist）的列表。
+
+这个联合列表里面的每个 cons cell 的 car 是希望生效的模式，cdr 则又是一个 alist，
+用于给变量赋值。
+
+#+BEGIN_SRC elisp
+( ;; 一个大列表，里面是很多 alist
+ (c-mode . (  ;; 这个 alist 控制 c-mode 模式下的行为，其中 cdr 又是一个 alist
+            (c-file-style . "BSD")
+            (subdirs . nil)
+           )
+ )
+ (nil . (     ;; 这个 alist 对所有 mode 生效
+         (indent-tabs-mode . t)
+         (tab-witdh . 4)
+         (fill-column . 80)
+        )
+ )
+)
+#+END_SRC
+
+那么问题来了，有时候我们希望能够不仅仅是赋值，而是执行 elisp 语句。这个时候我们
+不需要赋值，需要的是语句的副作用。我们可以将其赋值给随便一个不需要的变量上，例如
+叫 =eval= 。然后我们就可以这样写：
+
+
+#+BEGIN_SRC elisp
+((c-mode . ((c-file-style . "BSD")
+            (subdirs . nil)))
+ (nil . ((indent-tabs-mode . t)
+         (tab-witdh . 4)
+         (fill-column . 80)
+         (eval . (progn
+                   (flycheck-mode 1)
+                   (xxxxxx)
+                   (xxxxx))))))
+#+END_SRC
+
+不过这样会导致 Emacs 在加载这个文件的时候，提示你加载了一个不安全的文件，并且让
+你选择究竟是不加载，还是只允许一次，还是永久加载。如果选择永久加载，emacs 会记录
+在 =custom.el= 中。

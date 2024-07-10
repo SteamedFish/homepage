@@ -1,0 +1,30 @@
+---
+title: "Debian 10 新的 uidrange 策略路由"
+date: 2019-09-11T23:07:08+08:00
+categories:
+  - Debian
+  - Linux
+tags:
+  - Debian
+  - Linux
+---
+
+Debian 10 更新之后，策略路由增加了一个新的方法： =uidrange= 。
+
+#+BEGIN_SRC sh
+ip rule add uidrange 1000-2000 lookup 123
+#+END_SRC
+
+这个方法本来是 Linux 为 Android 设计的功能，在 Android 5.0 后开始使用。因为
+Android 每个 App 是使用不同的用户执行的，使用这个方法可以给每个不同的 App 设置不
+同的路由表。
+
+这个功能已经进入 4.10 版本的内核。对应的内核变更：
+
+- [[https://github.com/torvalds/linux/commit/86741ec25462e4c8cdce6df2f41ead05568c7d5e][commit1]]
+- [[https://github.com/torvalds/linux/commit/622ec2c9d52405973c9f1ca5116eb1c393adfc7d][commit2]]
+- [[https://github.com/torvalds/linux/commit/e2d118a1cb5e60d077131a09db1d81b90a5295fe][commit3]]
+
+既然已经纳入了 4.10 版本的 Linux 内核中，Debian 10 已经升级到 4.19 内核，
+现在自然也可以做到用户级别的路由表了。
+

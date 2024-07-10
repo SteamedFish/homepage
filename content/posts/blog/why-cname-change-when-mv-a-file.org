@@ -1,0 +1,91 @@
+---
+title: "为什么执行 mv 之后，文件的 ctime 会发生变化？"
+date: 2019-06-06T16:45:14+08:00
+tags:
+  - Linux
+---
+
+* 问题
+
+我们都知道文件包含以下这几个时间相关的属性：
+
+#+BEGIN_SRC language
+Access: 2019-04-26 14:56:17.086659763 +0800
+Modify: 2019-04-26 14:54:09.626659782 +0800
+Change: 2019-06-04 17:10:13.473326466 +0800
+ Birth: 2019-04-26 14:53:42.413326457 +0800
+#+END_SRC
+
+其中：
+
+- Access 为最后一次读取文件内容的时间
+- Modify 为最后一次改变文件内容的时间
+- Change 为最后一次改变文件属性的时间
+- Birth 为文件创建的时间
+
+一个有趣的现象是，在对文件进行重命名操作的时候（ =mv a b= ），理论上，文件内容不会
+被读取，该文件的内容和任何属性也不会被改变，但是它的 ctime，也就是 Change time，
+却发生了变化。这是为什么呢？
+
+* 分析
+
+让我们看一下 [[http://pubs.opengroup.org/onlinepubs/9699919799/functions/rename.html][POSIX 的规定]]，结果发现，POSIX 对此是未定义的：
+
+#+begin_quote
+Some implementations mark for update the last file status change timestamp of
+renamed files and some do not. Applications which make use of the last file
+status change timestamp may behave differently with respect to renamed files
+unless they are designed to allow for either behavior.
+#+end_quote
+
+于是我们只能去读源码了。
+
+
+* 源码分析
+
+** ext4 的实现
+
+在 ext4 的 [[https://github.com/torvalds/linux/blob/master/fs/ext4/namei.c#L3727][源码]] 中，是直接强行修改了 ctime 的，还说大家都这样做：
+
+#+BEGIN_SRC c
+/*
+ * Like most other Unix systems, set the ctime for inodes on a
+ * rename.
+ */
+old.inode->i_ctime = current_time(old.inode);
+#+END_SRC
+
+** reiserfs 的实现
+
+在 reiserfs 的 [[https://github.com/torvalds/linux/blob/master/fs/reiserfs/namei.c#L1574][源码]] 中，也是强行修改了 ctime，还特意说明之前不修改是个 bug：
+
+#+BEGIN_SRC c
+/*
+  * thanks to Alex Adriaanse <alex_a@caltech.edu> for patch
+  * which adds ctime update of renamed object
+  */
+old_inode->i_ctime = ctime;
+#+END_SRC
+
+** XFS 的实现
+
+感谢 XFS，在实现中给出了非常详细的解释，让我们终于明白为什么需要强行修改 ctime
+了。我们看一下 [[https://github.com/torvalds/linux/blob/master/fs/xfs/xfs_inode.c#L3385][源码]]：
+
+#+BEGIN_SRC c
+/*
+ * We always want to hit the ctime on the source inode.
+ *
+ * This isn't strictly required by the standards since the source
+ * inode isn't really being changed, but old unix file systems did
+ * it and some incremental backup programs won't work without it.
+ */
+xfs_trans_ichgtime(tp, src_ip, XFS_ICHGTIME_CHG);
+xfs_trans_log_inode(tp, src_ip, XFS_ILOG_CORE);
+#+END_SRC
+
+* 结论
+
+mv 文件的时候，确实不会修改文件的属性信息，理论上 ctime 是不会变化的。但是这样会
+导致很多依赖于文件修改时间的程序（例如一些增量备份程序）出现 BUG，因此绝大多数文
+件系统在处理 mv 操作的时候都强行修改了 ctime 时间。
