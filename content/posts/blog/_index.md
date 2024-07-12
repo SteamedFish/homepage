@@ -2,7 +2,7 @@
 title: My BLOG
 menu:
   sidebar:
-    name: BLOG
-    identifier: blog
+    name: OLD-BLOG
+    identifier: oldblog
     weight: 20
 ---
